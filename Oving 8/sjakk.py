@@ -155,12 +155,21 @@ def generate_algebraic_notation(
 
 
 class Piece:
-    def __init__(self, piece_id: int, side: int, position: Position) -> None:
+    def __init__(
+        self,
+        board: Board,
+        piece_id: int,
+        side: int,
+        position: Position,
+        has_moved=False,
+    ) -> None:
         self._direction = 1 if self.side == SIDES["WHITE"] else -1
 
+        self.has_moved = has_moved
         self.piece_id = piece_id
-        self.side = side
         self.position = position
+        self.board = board
+        self.side = side
 
         self.string = PIECE_STRINGS[side][piece_id]
 
@@ -181,46 +190,53 @@ class Piece:
         return x, y
 
     def _get_unsafe_horizontal_moves(
-        self, board: Board, starting_x: X, starting_y: Y
+        self, current_x: X, current_y: Y
     ) -> list[Position]:
         possible_moves = []
 
         for x in range(0, board.width):
-            if x == starting_x:
+            if x == letter_to_number(current_x):
                 continue
 
-            possible_moves.append((x, starting_y))
+            possible_moves.append((number_to_letter(x), current_y))
 
         return possible_moves
 
+    def get_horizontal_moves(self, current_x: X, current_y: Y) -> list[Position]:
+        possible_moves = self._get_unsafe_horizontal_moves(current_x, current_y)
+        # todo
+
     def _get_unsafe_vertical_moves(
-        self, board: Board, starting_x: X, starting_y: Y
+        self, current_x: X, current_y: Y
     ) -> list[Position]:
         possible_moves = []
 
         for y in range(0, board.height):
-            if y == starting_y:
+            if y == current_y:
                 continue
 
-            possible_moves.append((starting_x, y))
+            possible_moves.append((current_x, y))
 
         return possible_moves
 
     # logikk fra https://stackoverflow.com/a/29567034
     def _get_unsafe_diagonal_moves(
-        self, board: Board, starting_x, starting_y
+        self, current_x: X, current_y: Y
     ) -> list[Position]:
         possible_moves = []
 
         for x in range(0, board.width):
+            if x == letter_to_number(current_x):
+                continue
+
             for y in range(0, board.height):
-                if abs(x - starting_x) == abs(y - starting_y):
-                    possible_moves.append((x, y))
+                if abs(x - letter_to_number(current_x)) == abs(y - current_y):
+                    possible_moves.append((number_to_letter(x), y))
 
         return possible_moves
 
-    def _validate_moves(
-        self, board: Board, moves_to_check: list[Position]
+    """ def _validate_moves(
+        self, moves_to_check: list[Position]
     ) -> list[Position]:
         possible_moves = []
 
@@ -231,29 +247,35 @@ class Piece:
             if piece_in_new_position == None or piece_in_new_position.side != self.side:
                 possible_moves.append(new_position)
 
-        return possible_moves
+        return possible_moves """
 
-    def move(self, board: Board, new_position: Position) -> None:
-        board.move(self, new_position)
+    def unsafe_move(self, new_position: Position) -> None:
+        if self.has_moved == False:
+            self.has_moved = True
+
+        board._move(self, new_position)
+        self.position = new_position
+
+    def move(self, new_position: Position) -> None:
 
 
 class Pawn(Piece):
-    def __init__(self, side: Side, position: Position) -> None:
-        super().__init__(PIECE_IDS["PAWN"], side, position)
+    def __init__(self, board: Board, side: Side, position: Position) -> None:
+        super().__init__(board, PIECE_IDS["PAWN"], side, position)
 
-    def is_first_move(self, board: Board) -> bool:
-        starting_y = 1 if self.side == SIDES["WHITE"] else board.height - 2
+    def is_first_move(self) -> bool:
+        current_y = 1 if self.side == SIDES["WHITE"] else self.board.height - 2
 
-        return self.position[1] == starting_y
+        return self.position[1] == current_y
 
     def promote_to_queen(self, board: Board) -> Queen:
         # todo
         return Queen(self.side, self.position)
 
-    def get_moves(board: Board):
+    def get_moves():
         possible_moves = [(0, 1), (1, 1), (-1, 1)]
 
-        if self.is_first_move(board):
+        if self.is_first_move():
             possible_moves.append((0, 2))
 
         return _validate_moves()
@@ -269,18 +291,7 @@ class Board:
     def _get_pieces_index(self, x: X, y: Y) -> int:
         return letter_to_number(x) * self.width + y
 
-    def at(self, x: X, y: Y) -> Piece | None:
-        """
-        Henter en brikke fra posisjonen (x, y)
-        `None` hvis det ikke er en brikke der
-        """
-
-        if not 0 <= letter_to_number(x) < self.width or not 0 <= y < self.height:
-            return None
-
-        return self.pieces[_get_pieces_index(x, y)]
-
-    def move(self, piece: Piece, new_position: Position) -> None:
+    def _move(self, piece: Piece, new_position: Position) -> None:
         """
         Flytter en brikke til en ny posisjon og oppdaterer brikken
         Unsafe -- sjekk om trekket er gyldig først
@@ -291,3 +302,14 @@ class Board:
 
         self.pieces[_get_pieces_index(*old_position)] = None
         self.pieces[_get_pieces_index(*new_position)] = piece
+
+    def at(self, x: X, y: Y) -> Piece | None:
+        """
+        Henter en brikke fra posisjonen (x, y)
+        `None` hvis det ikke er en brikke der
+        """
+
+        if not 0 <= letter_to_number(x) < self.width or not 0 <= y < self.height:
+            return None
+
+        return self.pieces[_get_pieces_index(x, y)]
