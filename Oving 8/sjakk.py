@@ -219,7 +219,7 @@ class Piece:
 
         return possible_moves
 
-    # logikk fra https://stackoverflow.com/a/29567034
+    # logikk fra https://stackoverflow.com/a/29567034 test
     def _get_unsafe_diagonal_moves(
         self, current_x: X, current_y: Y
     ) -> list[Position]:
