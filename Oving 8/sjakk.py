@@ -189,14 +189,33 @@ class Piece:
 
         return x, y
 
-    def _get_unsafe_horizontal_moves(
-        self, current_x: X, current_y: Y
+    def _get_horizontal_moves(
+        self, current_x: X, current_y: Y, max_moves: int | None = None
     ) -> list[Position]:
         possible_moves = []
 
-        for x in range(0, board.width):
-            if x == letter_to_number(current_x):
-                continue
+        x_start = letter_to_number(current_x) - 1
+        x_end = max_moves if max_moves != None else 0
+
+        for x in range(x_start, 0, -1):
+            piece_at_position = self.board.at(number_to_letter(x), current_y)
+            
+            if piece_at_position != None:
+                if piece_at_position.side != self.side:
+                    possible_moves.append((number_to_letter(x), current_y))
+
+                break
+
+            possible_moves.append((number_to_letter(x), current_y))
+
+        for x in range(letter_to_number(current_x) + 1, board.width):
+            piece_at_position = self.board.at(number_to_letter(x), current_y)
+            
+            if piece_at_position != None:
+                if piece_at_position.side != self.side:
+                    possible_moves.append((number_to_letter(x), current_y))
+
+                break
 
             possible_moves.append((number_to_letter(x), current_y))
 
@@ -204,7 +223,7 @@ class Piece:
 
     def get_horizontal_moves(self, current_x: X, current_y: Y) -> list[Position]:
         possible_moves = self._get_unsafe_horizontal_moves(current_x, current_y)
-        # todo
+    
 
     def _get_unsafe_vertical_moves(
         self, current_x: X, current_y: Y
