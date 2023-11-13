@@ -1,18 +1,34 @@
+from typing import Union
+
 X_Str = str  # A, B, .. AA, AB, .. osv.
 Y_Str = int  # 1, 2, 3, .. osv (ikke 0-indeksert)
 X = int
 Y = int
 
-BoardPosition = tuple[X_Str, Y_str]
+BoardPosition = str  # X_StrY_Str, "A4", "B2", osv.
 MatrixPosition = tuple[Y, X]
 
 Side = 1 | 0
 SIDES = {"WHITE": 0, "BLACK": 1}
 
-Piece_Id = 5 | 4 | 3 | 2 | 1 | 0
-PIECE_IDS = {"BISHOP": 0, "KING": 1, "KNIGHT": 2, "PAWN": 3, "QUEEN": 4, "ROOK": 5}
+Any_Piece = Union["Bishop", "King", "Knight", "Pawn", "Queen", "Rook"]
 
-Piece_String = "♗" | "♔" | "♘" | "♙" | "♕" | "♖" | "♝" | "♚" | "♞" | "♟" | "♛" | "♜"
+Piece_Id = 5 | 4 | 3 | 2 | 1 | 0
+PIECE_IDS = {
+    "BISHOP": 0,
+    "B": 0,
+    "KING": 1,
+    "K": 1,
+    "KNIGHT": 2,
+    "N": 2,
+    "PAWN": 3,
+    "P": 3,
+    "QUEEN": 4,
+    "Q": 4,
+    "ROOK": 5,
+    "R": 5,
+}
+
 PIECE_STRINGS = {
     SIDES["BLACK"]: {
         PIECE_IDS["BISHOP"]: "♝",
@@ -32,16 +48,16 @@ PIECE_STRINGS = {
     },
 }
 
-Notation_Key = "B" | "K" | "N" | "P" | "Q" | "R"
-
-NOTATIONS = {
-    CAPTURE: "x",
-    CHECK: "+",
-    CHECKMATE: "#",
-    KINGSIDE_CASTLE: "O-O",
-    PROMOTION: "=",
-    QUEENSIDE_CASTLE: "O-O-O",
+ALGEBRAIC_NOTATION = {
+    "CAPTURE": "x",
+    "CHECK": "+",
+    "CHECKMATE": "#",
+    "KINGSIDE_CASTLE": "O-O",
+    "PROMOTION": "=",
+    "QUEENSIDE_CASTLE": "O-O-O",
 }
+
+DEFAULT_FORSYTH_EDWARDS_NOTATION = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"
 
 NUMBER_OF_LETTERS = 26
 UNICODE_A = 65
@@ -51,6 +67,14 @@ UNICODE_A = 65
 NUMBER_OF_PLAYERS = 2
 BOARD_SIZE = 8
 # ---
+
+
+def black_background(string: str) -> str:
+    return f"\x1b[0;37;40m{string}\x1b[0m"
+
+
+def white_background(string: str) -> str:
+    return f"\x1b[0;30;47m{string}\x1b[0m"
 
 
 def number_to_letter(number: int) -> str:
@@ -109,25 +133,25 @@ def letter_to_number(letter: str) -> str:
 
 
 def generate_algebraic_notation(
-    piece_key: Notation_Key,
-    new_position: Position,
-    old_position: Position | None = None,
+    piece_key: str,
+    new_position: MatrixPosition,
+    old_position: MatrixPosition | None = None,
     capture=False,
     kingside_castle=False,
     queenside_castle=False,
     check=False,
     checkmate=False,
-    promotion: Notation_Key | None = None,
+    promotion: str | None = None,
 ) -> str:
     # Denne er ikke perfekt men duger
     # F.eks. den vil ikke skille om du har to tårn som kan flyttes til samme position
     # siden det var for komplisert for en unødvendig feature
 
     if kingside_castle:
-        return NOTATIONS[KINGSIDE_CASTLE]
+        return ALGEBRAIC_NOTATION[KINGSIDE_CASTLE]
 
     if queenside_castle:
-        return NOTATIONS[QUEENSIDE_CASTLE]
+        return ALGEBRAIC_NOTATION[QUEENSIDE_CASTLE]
 
     string = ""
 
@@ -135,20 +159,123 @@ def generate_algebraic_notation(
         string += piece_key
 
     if capture:
-        string += NOTATIONS[CAPTURE]
+        string += ALGEBRAIC_NOTATION[CAPTURE]
 
     string = f"{number_to_letter(new_position[0])}{new_position[1]}"
 
     if promotion:
-        string += NOTATIONS[PROMOTION] + promotion
+        string += ALGEBRAIC_NOTATION[PROMOTION] + promotion
 
     if check:
-        string += NOTATIONS[CHECK]
+        string += ALGEBRAIC_NOTATION[CHECK]
 
     if checkmate:
-        string += NOTATIONS[CHECKMATE]
+        string += ALGEBRAIC_NOTATION[CHECKMATE]
 
     return string
+
+
+class Board:
+    def __init__(
+        self, forsyth_edwards_notation=DEFAULT_FORSYTH_EDWARDS_NOTATION
+    ) -> None:
+        self.height = BOARD_SIZE
+        self.width = BOARD_SIZE
+
+        self.pieces: Union[Any_Piece, None] = []
+
+    def __str__(self) -> str:
+        string = (
+            "  " + " ".join([number_to_letter(x) for x in range(0, self.width)]) + "\n"
+        )
+
+        prefix = [f"{x + 1} " for x in range(0, self.height)]
+
+        for y in range(0, self.height):
+            string += prefix[y]
+
+            for x in range(0, self.width):
+                piece = self.get(x, y)
+                x_is_even = x % 2 == 0
+                y_is_even = y % 2 == 0
+
+                is_white_square = (x_is_even and y_is_even) or (
+                    not x_is_even and not y_is_even
+                )
+
+                if is_white_square:
+                    string += white_background(f"{piece or ' '} ")
+                else:
+                    string += black_background(f"{piece or ' '} ")
+
+            string += "\n"
+
+        return string
+
+    def parse_position(
+        self, posistion: BoardPosition | MatrixPosition
+    ) -> MatrixPosition:
+        if isinstance(posistion, tuple):
+            return posistion
+
+        if posistion == ALGEBRAIC_NOTATION[KINGSIDE_CASTLE]:
+            return (6, 0)
+
+        if posistion == ALGEBRAIC_NOTATION[QUEENSIDE_CASTLE]:
+            return (2, 0)
+
+        if len(posistion) != 2:
+            raise ValueError("posistion må være en string med lengde 2")
+
+        x, y = posistion.split()
+
+        if x.isalpha():
+            x = number_to_letter(int(x))
+
+        if not x.isalpha():
+            raise ValueError("x må være en bokstav")
+
+        if not y.isdigit():
+            raise ValueError("y må være et tall")
+
+        return x, int(y) - 1
+
+    def translate(self, x: X, y: Y) -> int:
+        return y * self.width + x
+
+    def position_exists(self, x: X, y: Y) -> bool:
+        x_high = self.width - 1
+        y_high = self.height - 1
+
+        return 0 <= x <= x_high and 0 <= y <= y_high
+
+    def set(
+        self, position: MatrixPosition, piece_or_none: Union[Any_Piece, None]
+    ) -> None:
+        """
+        Setter en gitt verdi på posisjonen (x, y)
+        """
+
+        self.pieces[self.translate(*position)] = piece
+
+    def get(self, x: X, y: Y) -> Union[Any_Piece, None]:
+        """
+        Henter en brikke fra index [y][x]
+        `None` hvis det ikke er en brikke der
+        """
+
+        if not self.position_exists(x, y):
+            return None
+
+        return self.pieces[self.translate(x, y)]
+
+    def at(self, xy: str) -> Union[Any_Piece, None]:
+        """
+        Henter en brikke fra posisjonen (x, y)
+        `None` hvis det ikke er en brikke der
+        """
+
+        return self.get(*self.parse_position(xy))
 
 
 class Piece:
@@ -157,38 +284,44 @@ class Piece:
         board: Board,
         piece_id: int,
         side: int,
-        position: Position,
+        position: MatrixPosition,
         has_moved=False,
     ) -> None:
-        self._direction = 1 if self.side == SIDES["WHITE"] else -1
-
         self.has_moved = has_moved
         self.piece_id = piece_id
         self.position = position
         self.board = board
         self.side = side
 
+        self._direction = 1 if self.side == SIDES["WHITE"] else -1
         self.string = PIECE_STRINGS[side][piece_id]
 
     def __str__(self) -> str:
         return self.string
 
-    def _translate(self, relative_x: X, relative_y: Y) -> Position:
+    def _validate_moves(self, moves: list[MatrixPosition]) -> list[MatrixPosition]:
         """
-        Skriver om en relativ posisjon til en absolutt posisjon.
-          _translate(1, 0) -> 1 til høyre
-          _translate(0, 1) -> 1 mot motstanderens side
+        Filtrerer til bare trekk innenfor brettet som ikke har en brikke av samme side
+        Tar ikke hensyn til line-of-sight eller om det er et lovlig trekk for brikken
         """
 
-        x = self.position[0] + relative_x
-        y = self.position[1] + relative_y * self._direction
+        valid_positions: set[MatrixPosition] = set()
 
-        return x, y
+        for x, y in moves:
+            if not self.board.position_exists(x, y):
+                continue
+
+            piece_at_position = self.board.get(x, y)
+
+            if piece_at_position == None or piece_at_position.side != self.side:
+                valid_positions.add(x, y)
+
+        return list(valid_positions)
 
     def get_horizontal_line_of_sight(
         self, current_x: X, current_y: Y, max_moves: int | None = None
-    ) -> list[Position]:
-        possible_moves = []
+    ) -> list[MatrixPosition]:
+        positions: set[MatrixPosition] = set()
 
         x_start = current_x - max_moves if max_moves != None else 0
         x_end = current_x + max_moves if max_moves != None else self.board.width
@@ -197,70 +330,72 @@ class Piece:
         x_right = current_x + 1, x_end
 
         for x in range(*x_left):
-            piece_at_position = self.board.at(x, current_y)
+            piece_at_position = self.board.get(x, current_y)
 
             if piece_at_position == None:
-                possible_moves.append((x, current_y))
+                positions.add((x, current_y))
                 continue
 
             if piece_at_position.side != self.side:
-                possible_moves.append((x, current_y))
+                positions.add((x, current_y))
 
             break
 
         for x in range(*x_right):
-            piece_at_position = self.board.at(x, current_y)
+            piece_at_position = self.board.get(x, current_y)
 
             if piece_at_position == None:
-                possible_moves.append((x, current_y))
+                positions.add((x, current_y))
                 continue
 
             if piece_at_position.side != self.side:
-                possible_moves.append((x, current_y))
+                positions.add((x, current_y))
 
             break
 
-        return possible_moves
+        return list(positions)
 
-    def get_vertical_line_of_sight(self, current_x: X, current_y: Y) -> list[Position]:
-        possible_moves = []
+    def get_vertical_line_of_sight(
+        self, current_x: X, current_y: Y, max_moves: int | None = None
+    ) -> list[MatrixPosition]:
+        positions: set[MatrixPosition] = set()
 
-        x_start = current_x - max_moves if max_moves != None else 0
-        x_end = current_x + max_moves if max_moves != None else self.board.width
+        y_start = current_y - max_moves if max_moves != None else 0
+        y_end = current_y + max_moves if max_moves != None else self.board.height
 
-        x_left = current_x - 1, x_start, -1
-        x_right = current_x + 1, x_end
+        y_up = current_y - 1, y_start, -1
+        y_down = current_y + 1, y_end
 
-        # ↑
-        for y in range(y_centre_low, 0, -1):
-            piece_at_position = self.board.at(current_x, y)
+        for y in range(*y_up):
+            piece_at_position = self.board.get(current_x, y)
 
             if piece_at_position == None:
-                possible_moves.append((current_x, y))
+                positions.add((current_x, y))
                 continue
 
             if piece_at_position.side != self.side:
-                possible_moves.append((current_x, y))
+                positions.add((current_x, y))
 
             break
 
-        # ↓
-        for y in range(y_centre_high, y_end):
-            piece_at_position = self.board.at(current_x, y)
+        for y in range(*y_down):
+            piece_at_position = self.board.get(current_x, y)
 
             if piece_at_position == None:
-                possible_moves.append((current_x, y))
+                positions.add((current_x, y))
                 continue
 
             if piece_at_position.side != self.side:
-                possible_moves.append((current_x, y))
+                positions.add((current_x, y))
 
             break
 
-        return possible_moves
+        return list(positions)
 
-    def get_diagonal_line_of_sight(self, current_x: X, current_y: Y) -> list[Position]:
-        possible_moves = []
+    def get_diagonal_line_of_sight(
+        self, current_x: X, current_y: Y, max_moves: int | None = None
+    ) -> list[MatrixPosition]:
+        positions: set[MatrixPosition] = set()
 
         x_start = current_x - max_moves if max_moves != None else 0
         y_start = current_y - max_moves if max_moves != None else 0
@@ -275,79 +410,150 @@ class Piece:
 
         for x in range(*x_left):
             for y in range(*y_up):
-                piece_at_position = self.board.at(x, y)
+                piece_at_position = self.board.get(x, y)
 
                 if piece_at_position == None:
-                    possible_moves.append((x, y))
+                    positions.add((x, y))
                     continue
 
                 if piece_at_position.side != self.side:
-                    possible_moves.append((x, y))
+                    positions.add((x, y))
 
                 break
 
         for x in range(*x_left):
             for y in range(*y_down):
-                piece_at_position = self.board.at(x, y)
+                piece_at_position = self.board.get(x, y)
 
                 if piece_at_position == None:
-                    possible_moves.append((x, y))
+                    positions.add((x, y))
                     continue
 
                 if piece_at_position.side != self.side:
-                    possible_moves.append((x, y))
+                    positions.add((x, y))
 
                 break
 
         for x in range(*x_right):
             for y in range(*y_up):
-                piece_at_position = self.board.at(x, y)
+                piece_at_position = self.board.get(x, y)
 
                 if piece_at_position == None:
-                    possible_moves.append((x, y))
+                    positions.add((x, y))
                     continue
 
                 if piece_at_position.side != self.side:
-                    possible_moves.append((x, y))
+                    positions.add((x, y))
 
                 break
 
         for x in range(*x_right):
             for y in range(*y_down):
-                piece_at_position = self.board.at(x, y)
+                piece_at_position = self.board.get(x, y)
 
                 if piece_at_position == None:
-                    possible_moves.append((x, y))
+                    positions.add((x, y))
                     continue
 
                 if piece_at_position.side != self.side:
-                    possible_moves.append((x, y))
+                    positions.add((x, y))
 
                 break
 
-        return possible_moves
+        return list(positions)
 
-    def unsafe_move(self, new_position: Position) -> None:
+    def move(self, new_position: MatrixPosition) -> None:
         if self.has_moved == False:
             self.has_moved = True
 
         board._move(self, new_position)
         self.position = new_position
 
-    def move(self, new_position: Position) -> None:
-        return None
+
+class Bishop(Piece):
+    def __init__(
+        self, board: Board, side: Side, position: MatrixPosition, has_moved=False
+    ) -> None:
+        super().__init__(board, PIECE_IDS["BISHOP"], side, position, has_moved)
+
+    def get_moves(self):
+        positions = set(self.get_horizontal_line_of_sight(*self.position))
+
+        return _validate_moves(positions)
+
+
+class King(Piece):
+    def __init__(
+        self, board: Board, side: Side, position: MatrixPosition, has_moved=False
+    ) -> None:
+        super().__init__(board, PIECE_IDS["KING"], side, position, has_moved)
+
+    def get_moves(self):
+        positions = set(
+            [
+                *self.get_horizontal_line_of_sight(*self.position, max_moves=1),
+                *self.get_vertical_line_of_sight(*self.position, max_moves=1),
+                *self.get_diagonal_line_of_sight(*self.position, max_moves=1),
+            ]
+        )
+
+        return _validate_moves(positions)
+
+
+class Knight(Piece):
+    def __init__(
+        self, board: Board, side: Side, position: MatrixPosition, has_moved=False
+    ) -> None:
+        super().__init__(board, PIECE_IDS["KNIGHT"], side, position, has_moved)
+
+    def get_moves(self):
+        positions = set(
+            [(-2, 1), (-2, -1), (-1, 2), (-1, -2), (1, 2), (1, -2), (2, 1), (2, -1)]
+        )
+
+        return _validate_moves(positions)
+
+
+class Queen(Piece):
+    def __init__(
+        self, board: Board, side: Side, position: MatrixPosition, has_moved=False
+    ) -> None:
+        super().__init__(board, PIECE_IDS["QUEEN"], side, position, has_moved)
+
+    def get_moves(self):
+        positions = set(
+            [
+                *self.get_horizontal_line_of_sight(*self.position),
+                *self.get_vertical_line_of_sight(*self.position),
+                *self.get_diagonal_line_of_sight(*self.position),
+            ]
+        )
+
+        return _validate_moves(positions)
 
 
 class Pawn(Piece):
     def __init__(
-        self, board: Board, side: Side, position: Position, has_moved=False
+        self, board: Board, side: Side, position: MatrixPosition, has_moved=False
     ) -> None:
         super().__init__(board, PIECE_IDS["PAWN"], side, position, has_moved)
 
-    def is_first_move(self) -> bool:
-        current_y = 1 if self.side == SIDES["WHITE"] else self.board.height - 2
+    def get_moves(self):
+        positions = set([(0, 1)])
 
-        return self.position[1] == current_y
+        top_left = self.board.get(-1, 1)
+        top_right = self.board.get(1, 1)
+
+        if top_left != None and top_left.side != self.side:
+            positions.add((-1, 1))
+
+        if top_right != None and top_right.side != self.side:
+            positions.add((1, 1))
+
+        if not self.has_moved:
+            positions.add((0, 2))
+
+        return _validate_moves(positions)
 
     def promote_to_queen(self) -> Queen:
         queen = Queen(self.board, self.side, self.position, has_moved=True)
@@ -356,39 +562,60 @@ class Pawn(Piece):
 
         return queen
 
+
+class Rook(Piece):
+    def __init__(
+        self, board: Board, side: Side, position: MatrixPosition, has_moved=False
+    ) -> None:
+        super().__init__(board, PIECE_IDS["ROOK"], side, position, has_moved)
+
     def get_moves(self):
-        possible_moves = [(0, 1), (1, 1), (-1, 1)]
+        positions = set(
+            [
+                *self.get_vertical_line_of_sight(*self.position),
+                *self.get_diagonal_line_of_sight(*self.position),
+            ]
+        )
 
-        if self.is_first_move():
-            possible_moves.append((0, 2))
-
-        return _validate_moves()
+        return _validate_moves(positions)
 
 
-class Board:
-    def __init__(self) -> None:
-        self.height = BOARD_SIZE
-        self.width = BOARD_SIZE
+def create_piece_from_forsyth_edwards_notation_key(
+    board: Board,
+    piece: str,
+    position: MatrixPosition,
+) -> Any_Piece:
+    piece_id = PIECE_IDS[piece.upper()]
+    side = SIDES["BLACK"] if piece.islower() else SIDES["WHITE"]
 
-        self.pieces: list[Piece] = []
+    return Piece(board, piece_id, side, position)
 
-    def _map(self, x: X, y: Y) -> int:
-        return x * self.width + y
 
-    def set(self, position: Position, piece_or_none: Piece | None) -> None:
-        """
-        Setter en gitt verdi på posisjonen (x, y)
-        """
+def load_pieces(board: Board, forsyth_edwards_notation: str) -> list[Any_Piece | None]:
+    pieces: list[Piece | None] = []
+    rows = forsyth_edwards_notation.split("/")
 
-        self.pieces[_map(*position)] = piece
+    for y, row in enumerate(rows):
+        x = 0
 
-    def at(self, x: X, y: Y) -> Piece | None:
-        """
-        Henter en brikke fra posisjonen (x, y)
-        `None` hvis det ikke er en brikke der
-        """
+        for key in row:
+            if key.isdigit():
+                pieces.extend([None for _ in range(0, int(key))])
+                x += int(key)
 
-        if not 0 <= x < self.width or not 0 <= y < self.height:
-            return None
+                continue
 
-        return self.pieces[_map(x, y)]
+            pieces.append(
+                create_piece_from_forsyth_edwards_notation_key(board, key, (x, y))
+            )
+
+            x += 1
+
+    return pieces
+
+
+board = Board()
+board.pieces = load_pieces(board, DEFAULT_FORSYTH_EDWARDS_NOTATION)
+
+print(board)
+print(board.at("G8").get_moves())
