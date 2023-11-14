@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 28.0.0, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 viewBox="0 0 651 156" style="enable-background:new 0 0 651 156;" xml:space="preserve">
+<style type="text/css">
+	.st0{fill:#FFFFFF;}
+	.st1{fill:#FFFFFF;stroke:#000000;}
+	.st2{fill:none;stroke:#000000;stroke-miterlimit:10;}
+	.st3{fill:none;}
+	.st4{font-family:'Helvetica';}
+	.st5{font-size:12px;}
+</style>
+<rect class="st0" width="651" height="156"/>
+<g>
+	<ellipse pointer-events="all" class="st1" cx="35.5" cy="35.5" rx="25" ry="25"/>
+	<ellipse pointer-events="all" class="st1" cx="195.5" cy="35.5" rx="25" ry="25"/>
+	<ellipse pointer-events="all" class="st1" cx="355.5" cy="35.5" rx="25" ry="25"/>
+	<path pointer-events="stroke" class="st2" d="M60.5,40.5h110"/>
+	<path pointer-events="stroke" class="st2" d="M220.5,40.5h110"/>
+	<rect x="20.5" y="70.5" pointer-events="all" class="st3" width="40" height="20"/>
+	<g transform="translate(-0.5 -0.5)">
+		<text transform="matrix(1 0 0 1 16.8093 77.6127)" class="st4 st5">main</text>
+	</g>
+	<path pointer-events="stroke" class="st2" d="M280.5,40.5v70c0,6.7,3.3,10,10,10h110c6.7,0,13.3,0,20,0h40"/>
+	<ellipse pointer-events="all" class="st1" cx="485.5" cy="120.5" rx="25" ry="25"/>
+	<ellipse pointer-events="all" class="st1" cx="615.5" cy="120.5" rx="25" ry="25"/>
+	<path pointer-events="stroke" class="st2" d="M510.5,120.5h80"/>
+	<rect x="370.5" y="125.5" pointer-events="all" class="st3" width="40" height="20"/>
+	<g transform="translate(-0.5 -0.5)">
+		<text transform="matrix(1 0 0 1 350.4154 138.5332)" class="st4 st5">developer</text>
+	</g>
+</g>
+</svg>
