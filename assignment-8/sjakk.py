@@ -69,6 +69,10 @@ BOARD_SIZE = 8
 # ---
 
 
+def clear_console() -> None:
+    print("\033c", end="")
+
+
 def black_background(string: str) -> str:
     return f"\x1b[0;37;40m{string}\x1b[0m"
 
@@ -218,22 +222,19 @@ class Board:
         if isinstance(posistion, tuple):
             return posistion
 
-        if posistion == ALGEBRAIC_NOTATION[KINGSIDE_CASTLE]:
+        if posistion == ALGEBRAIC_NOTATION["KINGSIDE_CASTLE"]:
             return (6, 0)
 
-        if posistion == ALGEBRAIC_NOTATION[QUEENSIDE_CASTLE]:
+        if posistion == ALGEBRAIC_NOTATION["QUEENSIDE_CASTLE"]:
             return (2, 0)
 
         if len(posistion) != 2:
             raise ValueError("posistion må være en string med lengde 2")
 
-        x, y = posistion.split()
+        x, y = posistion
 
         if x.isalpha():
-            x = number_to_letter(int(x))
-
-        if not x.isalpha():
-            raise ValueError("x må være en bokstav")
+            x = letter_to_number(x)
 
         if not y.isdigit():
             raise ValueError("y må være et tall")
@@ -267,7 +268,9 @@ class Board:
         if not self.position_exists(x, y):
             return None
 
-        return self.pieces[self.translate(x, y)]
+        piece = self.pieces[self.translate(x, y)]
+
+        return piece
 
     def at(self, xy: str) -> Union[Any_Piece, None]:
         """
@@ -293,13 +296,21 @@ class Piece:
         self.board = board
         self.side = side
 
-        self._direction = 1 if self.side == SIDES["WHITE"] else -1
+        self._direction = -1 if self.side == SIDES["WHITE"] else 1
         self.string = PIECE_STRINGS[side][piece_id]
 
     def __str__(self) -> str:
         return self.string
 
-    def _validate_moves(self, moves: list[MatrixPosition]) -> list[MatrixPosition]:
+    def _translate_move(self, move: MatrixPosition) -> MatrixPosition:
+        relative_x = self.position[0] + move[0] * self._direction
+        relative_y = self.position[1] + move[1] * self._direction
+
+        return relative_x, relative_y
+
+    def _validate_moves(
+        self, relative_moves: list[MatrixPosition]
+    ) -> list[MatrixPosition]:
         """
         Filtrerer til bare trekk innenfor brettet som ikke har en brikke av samme side
         Tar ikke hensyn til line-of-sight eller om det er et lovlig trekk for brikken
@@ -307,14 +318,16 @@ class Piece:
 
         valid_positions: set[MatrixPosition] = set()
 
-        for x, y in moves:
+        for relative_move in relative_moves:
+            x, y = self._translate_move(relative_move)
+
             if not self.board.position_exists(x, y):
                 continue
 
             piece_at_position = self.board.get(x, y)
 
             if piece_at_position == None or piece_at_position.side != self.side:
-                valid_positions.add(x, y)
+                valid_positions.add((x, y))
 
         return list(valid_positions)
 
@@ -462,6 +475,9 @@ class Piece:
 
         return list(positions)
 
+    def get_moves(self):
+        raise NotImplementedError("get_moves må implementeres i child ")
+
     def move(self, new_position: MatrixPosition) -> None:
         if self.has_moved == False:
             self.has_moved = True
@@ -479,7 +495,7 @@ class Bishop(Piece):
     def get_moves(self):
         positions = set(self.get_horizontal_line_of_sight(*self.position))
 
-        return _validate_moves(positions)
+        return self._validate_moves(positions)
 
 
 class King(Piece):
@@ -497,7 +513,7 @@ class King(Piece):
             ]
         )
 
-        return _validate_moves(positions)
+        return self._validate_moves(positions)
 
 
 class Knight(Piece):
@@ -511,7 +527,7 @@ class Knight(Piece):
             [(-2, 1), (-2, -1), (-1, 2), (-1, -2), (1, 2), (1, -2), (2, 1), (2, -1)]
         )
 
-        return _validate_moves(positions)
+        return self._validate_moves(positions)
 
 
 class Queen(Piece):
@@ -529,7 +545,7 @@ class Queen(Piece):
             ]
         )
 
-        return _validate_moves(positions)
+        return self._validate_moves(positions)
 
 
 class Pawn(Piece):
@@ -541,8 +557,11 @@ class Pawn(Piece):
     def get_moves(self):
         positions = set([(0, 1)])
 
-        top_left = self.board.get(-1, 1)
-        top_right = self.board.get(1, 1)
+        if not self.has_moved:
+            positions.add((0, 2))
+
+        top_left = self.board.get(*self._translate_move((-1, 1)))
+        top_right = self.board.get(*self._translate_move((1, 1)))
 
         if top_left != None and top_left.side != self.side:
             positions.add((-1, 1))
@@ -550,10 +569,7 @@ class Pawn(Piece):
         if top_right != None and top_right.side != self.side:
             positions.add((1, 1))
 
-        if not self.has_moved:
-            positions.add((0, 2))
-
-        return _validate_moves(positions)
+        return self._validate_moves(positions)
 
     def promote_to_queen(self) -> Queen:
         queen = Queen(self.board, self.side, self.position, has_moved=True)
@@ -577,45 +593,70 @@ class Rook(Piece):
             ]
         )
 
-        return _validate_moves(positions)
+        return self._validate_moves(positions)
 
 
-def create_piece_from_forsyth_edwards_notation_key(
-    board: Board,
-    piece: str,
-    position: MatrixPosition,
-) -> Any_Piece:
-    piece_id = PIECE_IDS[piece.upper()]
-    side = SIDES["BLACK"] if piece.islower() else SIDES["WHITE"]
-
-    return Piece(board, piece_id, side, position)
-
-
-def load_pieces(board: Board, forsyth_edwards_notation: str) -> list[Any_Piece | None]:
-    pieces: list[Piece | None] = []
-    rows = forsyth_edwards_notation.split("/")
-
-    for y, row in enumerate(rows):
-        x = 0
-
-        for key in row:
-            if key.isdigit():
-                pieces.extend([None for _ in range(0, int(key))])
-                x += int(key)
-
-                continue
-
-            pieces.append(
-                create_piece_from_forsyth_edwards_notation_key(board, key, (x, y))
-            )
-
-            x += 1
-
-    return pieces
+PIECE_CLASSES = {
+    PIECE_IDS["BISHOP"]: Bishop,
+    PIECE_IDS["KING"]: King,
+    PIECE_IDS["KNIGHT"]: Knight,
+    PIECE_IDS["PAWN"]: Pawn,
+    PIECE_IDS["QUEEN"]: Queen,
+    PIECE_IDS["ROOK"]: Rook,
+}
 
 
-board = Board()
-board.pieces = load_pieces(board, DEFAULT_FORSYTH_EDWARDS_NOTATION)
+class Game:
+    def __init__(
+        self, forsyth_edwards_notation=DEFAULT_FORSYTH_EDWARDS_NOTATION
+    ) -> None:
+        self.board = Board()
+        self.turns = []
 
-print(board)
-print(board.at("G8").get_moves())
+        self.board.pieces = self.load_pieces(forsyth_edwards_notation)
+
+    def create_piece_from_forsyth_edwards_notation_key(
+        self, piece: str, position: MatrixPosition
+    ) -> Any_Piece:
+        piece_id = PIECE_IDS[piece.upper()]
+        side = SIDES["BLACK"] if piece.islower() else SIDES["WHITE"]
+
+        piece_class = PIECE_CLASSES.get(piece_id)
+
+        return piece_class(self.board, side, position)
+
+    def load_pieces(self, forsyth_edwards_notation: str) -> list[Any_Piece | None]:
+        pieces: list[Piece | None] = []
+        rows = forsyth_edwards_notation.split("/")
+
+        for y, row in enumerate(rows):
+            x = 0
+
+            for key in row:
+                if key.isdigit():
+                    pieces.extend([None for _ in range(0, int(key))])
+                    x += int(key)
+
+                    continue
+
+                pieces.append(
+                    self.create_piece_from_forsyth_edwards_notation_key(key, (x, y))
+                )
+
+                x += 1
+
+        return pieces
+
+    def next_turn(self):
+        self.turn += 1
+
+        clear_console()
+        print(self.board)
+
+
+game = Game()
+
+print(game.board)
+moves = game.board.at("B2").get_moves()
+for move in moves:
+    print(f"{number_to_letter(move[0])}{move[1] + 1}")
